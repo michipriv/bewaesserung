@@ -1,0 +1,24 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pio run:*)",
+      "Bash(where:*)",
+      "Bash(where pio:*)",
+      "Bash(dir /s /b \"C:\\\\Users\\\\*\\\\.platformio\\\\penv\\\\Scripts\\\\pio.exe\")",
+      "Bash(dir /s /b \"C:\\\\Users\\\\*\\\\.platformio\\\\penv\\\\Scripts\\\\platformio.exe\")",
+      "Bash(\"$HOME/.platformio/penv/Scripts/pio.exe\" run)",
+      "Bash(\"$HOME/.platformio/penv/Scripts/pio.exe\" pkg update -g)",
+      "Bash(\"$HOME/.platformio/penv/Scripts/pio.exe\" platform install espressif32 --with-package framework-arduinoespressif32)",
+      "Bash(\"$HOME/.platformio/penv/Scripts/pio.exe\" pkg install:*)",
+      "Bash(\"$HOME/.platformio/penv/Scripts/pio.exe\" platform update espressif32)",
+      "Bash(\"$HOME/.platformio/penv/Scripts/pio.exe\" pkg uninstall -g -t framework-arduinoespressif32)",
+      "Bash(\"$HOME/.platformio/penv/Scripts/pio.exe\" pkg install -g -t framework-arduinoespressif32)",
+      "Bash(C:Usersmmade.platformiopenvScriptsplatformio.exe run --project-dir C:homebewaesserung)",
+      "Bash(\"/c/Users/mmade/.platformio/penv/Scripts/platformio.exe\" run --project-dir \"/c/home/bewaesserung\")",
+      "Bash(\"/c/Users/mmade/.platformio/penv/Scripts/pio.exe\" platform uninstall espressif32)",
+      "Bash(\"/c/Users/mmade/.platformio/penv/Scripts/pio.exe\" platform install espressif32)",
+      "Bash(where.exe:*)",
+      "Bash(python -m platformio:*)"
+    ]
+  }
+}
