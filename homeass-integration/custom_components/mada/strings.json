@@ -1,0 +1,26 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "MADA Bewässerungssystem",
+        "description": "Geben Sie die IP-Adresse oder den Hostnamen des MADA-Geräts ein.",
+        "data": {
+          "host": "Host (z.B. MADA.local oder 192.168.1.100)"
+        }
+      },
+      "discovery_confirm": {
+        "title": "MADA gefunden!",
+        "description": "Folgendes Gerät wurde automatisch erkannt:\n\nName: {name}\nHost: {host}\nModell: {model}\n\nMöchten Sie dieses Gerät hinzufügen?"
+      }
+    },
+    "error": {
+      "cannot_connect": "Verbindung zum Gerät fehlgeschlagen. Bitte überprüfen Sie die IP-Adresse/Hostname und stellen Sie sicher, dass das Gerät im Netzwerk erreichbar ist.",
+      "invalid_device": "Das Gerät ist kein MADA Bewässerungssystem.",
+      "unknown": "Ein unbekannter Fehler ist aufgetreten."
+    },
+    "abort": {
+      "already_configured": "Dieses Gerät ist bereits konfiguriert.",
+      "cannot_connect": "Verbindung zum Gerät nicht möglich."
+    }
+  }
+}

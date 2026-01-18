@@ -1,0 +1,18 @@
+{
+  "domain": "higrow",
+  "name": "HiGrow Irrigation",
+  "version": "1.0.0",
+  "documentation": "https://github.com/michipriv/bewaesserung",
+  "issue_tracker": "https://github.com/michipriv/bewaesserung/issues",
+  "requirements": [],
+  "codeowners": ["@michipriv"],
+  "config_flow": true,
+  "dependencies": [],
+  "zeroconf": [
+    {
+      "type": "_http._tcp.local.",
+      "name": "higrow*"
+    }
+  ],
+  "iot_class": "local_polling"
+}

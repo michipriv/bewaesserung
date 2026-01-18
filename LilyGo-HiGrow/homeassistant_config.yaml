@@ -1,0 +1,186 @@
+# Home Assistant Configuration für HiGrow
+# Datei: homeassistant_config.yaml
+# 
+# Diese Konfiguration muss in die configuration.yaml von Home Assistant eingefügt werden
+# Pfad: /config/configuration.yaml
+
+#===========================================
+# SENSOREN
+#===========================================
+sensor:
+  # Bodenfeuchte
+  - platform: rest
+    name: "HiGrow Bodenfeuchte"
+    resource: "http://higrow.local/rpc/mada.GetStatus"
+    value_template: "{{ value_json.soil.moisture }}"
+    unit_of_measurement: "%"
+    device_class: moisture
+    scan_interval: 30
+    
+  # Salz/Leitfähigkeit
+  - platform: rest
+    name: "HiGrow Salz"
+    resource: "http://higrow.local/rpc/mada.GetStatus"
+    value_template: "{{ value_json.soil.salt }}"
+    unit_of_measurement: "µS/cm"
+    icon: mdi:shaker
+    scan_interval: 30
+    
+  # Batterie Spannung
+  - platform: rest
+    name: "HiGrow Batterie Spannung"
+    resource: "http://higrow.local/rpc/mada.GetStatus"
+    value_template: "{{ value_json.battery.voltage }}"
+    unit_of_measurement: "mV"
+    device_class: voltage
+    scan_interval: 30
+    
+  # Batterie Prozent
+  - platform: rest
+    name: "HiGrow Batterie"
+    resource: "http://higrow.local/rpc/mada.GetStatus"
+    value_template: "{{ value_json.battery.percent }}"
+    unit_of_measurement: "%"
+    device_class: battery
+    scan_interval: 30
+    
+  # Temperatur
+  - platform: rest
+    name: "HiGrow Temperatur"
+    resource: "http://higrow.local/rpc/mada.GetStatus"
+    value_template: "{{ value_json.temperature.value }}"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    scan_interval: 30
+    
+  # Luftfeuchtigkeit
+  - platform: rest
+    name: "HiGrow Luftfeuchtigkeit"
+    resource: "http://higrow.local/rpc/mada.GetStatus"
+    value_template: "{{ value_json.humidity.value }}"
+    unit_of_measurement: "%"
+    device_class: humidity
+    scan_interval: 30
+    
+  # Helligkeit
+  - platform: rest
+    name: "HiGrow Helligkeit"
+    resource: "http://higrow.local/rpc/mada.GetStatus"
+    value_template: "{{ value_json.light.lux }}"
+    unit_of_measurement: "lx"
+    device_class: illuminance
+    scan_interval: 30
+    
+  # WiFi Signal
+  - platform: rest
+    name: "HiGrow WiFi Signal"
+    resource: "http://higrow.local/rpc/mada.GetStatus"
+    value_template: "{{ value_json.system.wifi_rssi }}"
+    unit_of_measurement: "dBm"
+    device_class: signal_strength
+    scan_interval: 60
+    
+  # Uptime
+  - platform: rest
+    name: "HiGrow Uptime"
+    resource: "http://higrow.local/rpc/mada.GetStatus"
+    value_template: "{{ value_json.system.uptime }}"
+    unit_of_measurement: "s"
+    icon: mdi:timer
+    scan_interval: 60
+    
+  # PWM Zielwert
+  - platform: rest
+    name: "HiGrow Pumpenleistung Ziel"
+    resource: "http://higrow.local/rpc/mada.GetStatus"
+    value_template: "{{ value_json.pump.pwm_target }}"
+    unit_of_measurement: "%"
+    icon: mdi:gauge
+    scan_interval: 30
+    
+  # PWM Aktuell
+  - platform: rest
+    name: "HiGrow Pumpenleistung Aktiv"
+    resource: "http://higrow.local/rpc/mada.GetStatus"
+    value_template: "{{ value_json.pump.pwm_active }}"
+    unit_of_measurement: "%"
+    icon: mdi:gauge
+    scan_interval: 5
+
+#===========================================
+# SCHALTER (Pumpe)
+#===========================================
+switch:
+  - platform: rest
+    name: "HiGrow Pumpe"
+    resource: "http://higrow.local/rpc/Pump.Set"
+    state_resource: "http://higrow.local/rpc/mada.GetStatus"
+    body_on: '{"on": true}'
+    body_off: '{"on": false}'
+    is_on_template: "{{ value_json.pump.running }}"
+    headers:
+      Content-Type: application/json
+    icon: mdi:water-pump
+
+#===========================================
+# INPUT NUMBER (PWM Slider)
+#===========================================
+input_number:
+  higrow_pwm:
+    name: "HiGrow Pumpenleistung"
+    min: 0
+    max: 100
+    step: 1
+    unit_of_measurement: "%"
+    icon: mdi:gauge
+    mode: slider
+
+#===========================================
+# REST COMMAND (PWM setzen)
+#===========================================
+rest_command:
+  higrow_set_pwm:
+    url: "http://higrow.local/rpc/Pump.SetPWM"
+    method: POST
+    content_type: "application/json"
+    payload: '{"pwm": {{ pwm }}}'
+
+#===========================================
+# AUTOMATION (PWM Slider → ESP32)
+#===========================================
+automation:
+  - alias: "HiGrow PWM Slider → ESP32"
+    trigger:
+      - platform: state
+        entity_id: input_number.higrow_pwm
+    action:
+      - service: rest_command.higrow_set_pwm
+        data:
+          pwm: "{{ states('input_number.higrow_pwm') | int }}"
+    mode: single
+
+#===========================================
+# LOVELACE DASHBOARD BEISPIEL
+#===========================================
+# In der Lovelace UI kann folgende Karte verwendet werden:
+#
+# type: entities
+# title: HiGrow Bewässerung
+# entities:
+#   - entity: sensor.higrow_bodenfeuchte
+#     name: Bodenfeuchte
+#   - entity: sensor.higrow_temperatur
+#     name: Temperatur
+#   - entity: sensor.higrow_luftfeuchtigkeit
+#     name: Luftfeuchtigkeit
+#   - entity: sensor.higrow_batterie
+#     name: Batterie
+#   - type: divider
+#   - entity: switch.higrow_pumpe
+#     name: Pumpe
+#   - entity: input_number.higrow_pwm
+#     name: Pumpenleistung
+#   - entity: sensor.higrow_pumpenleistung_aktiv
+#     name: Aktuelle Leistung
+
+# EOF
