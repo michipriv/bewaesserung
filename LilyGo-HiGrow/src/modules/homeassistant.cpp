@@ -71,16 +71,26 @@ void HomeAssistantIntegration::setupRestAPI() {
         this->handleGetStatus(request);
     });
     
-    server->on("/rpc/Pump.Set", HTTP_POST, [this](AsyncWebServerRequest *request) {}, 
-               NULL,
-               [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-        this->handlePumpSet(request);
+    server->on("/rpc/Pump.Set", HTTP_POST, [this](AsyncWebServerRequest *request) {
+        this->handlePumpSet(request, this->pumpSetBody);
+        this->pumpSetBody = ""; // Clear buffer
+    }, NULL,
+    [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+        // Collect body data
+        for (size_t i = 0; i < len; i++) {
+            this->pumpSetBody += (char)data[i];
+        }
     });
     
-    server->on("/rpc/Pump.SetPWM", HTTP_POST, [this](AsyncWebServerRequest *request) {}, 
-               NULL,
-               [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
-        this->handlePumpSetPWM(request);
+    server->on("/rpc/Pump.SetPWM", HTTP_POST, [this](AsyncWebServerRequest *request) {
+        this->handlePumpSetPWM(request, this->pumpSetPWMBody);
+        this->pumpSetPWMBody = ""; // Clear buffer
+    }, NULL,
+    [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+        // Collect body data
+        for (size_t i = 0; i < len; i++) {
+            this->pumpSetPWMBody += (char)data[i];
+        }
     });
     
     Serial.println("REST API endpoints registered:");
@@ -298,21 +308,26 @@ void HomeAssistantIntegration::createStatusJSON(String& output) {
 //*********************************
 // Endpoint 3: Pump Control
 //*********************************
-void HomeAssistantIntegration::handlePumpSet(AsyncWebServerRequest *request) {
+void HomeAssistantIntegration::handlePumpSet(AsyncWebServerRequest *request, String body) {
     if (!pumpControl) {
         request->send(503, "application/json", "{\"error\":\"Pump not available\"}");
         return;
     }
     
-    String body;
-    if (request->hasParam("plain", true)) {
-        body = request->getParam("plain", true)->value();
+    Serial.print("Pump.Set received body: ");
+    Serial.println(body);
+    
+    if (body.length() == 0) {
+        request->send(400, "application/json", "{\"error\":\"Empty body\"}");
+        return;
     }
     
     StaticJsonDocument<256> doc;
     DeserializationError error = deserializeJson(doc, body);
     
     if (error) {
+        Serial.print("JSON parse error: ");
+        Serial.println(error.c_str());
         request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
         return;
     }
@@ -342,21 +357,26 @@ void HomeAssistantIntegration::handlePumpSet(AsyncWebServerRequest *request) {
 //*********************************
 // Endpoint 4: Set PWM
 //*********************************
-void HomeAssistantIntegration::handlePumpSetPWM(AsyncWebServerRequest *request) {
+void HomeAssistantIntegration::handlePumpSetPWM(AsyncWebServerRequest *request, String body) {
     if (!pumpControl) {
         request->send(503, "application/json", "{\"error\":\"Pump not available\"}");
         return;
     }
     
-    String body;
-    if (request->hasParam("plain", true)) {
-        body = request->getParam("plain", true)->value();
+    Serial.print("Pump.SetPWM received body: ");
+    Serial.println(body);
+    
+    if (body.length() == 0) {
+        request->send(400, "application/json", "{\"error\":\"Empty body\"}");
+        return;
     }
     
     StaticJsonDocument<256> doc;
     DeserializationError error = deserializeJson(doc, body);
     
     if (error) {
+        Serial.print("JSON parse error: ");
+        Serial.println(error.c_str());
         request->send(400, "application/json", "{\"error\":\"Invalid JSON\"}");
         return;
     }

@@ -135,26 +135,39 @@ class MadaSwitchFromMetadata(CoordinatorEntity, SwitchEntity):
         """Set switch state via API."""
         try:
             async with async_timeout.timeout(10):
-                # Endpoint basierend auf entity_id
-                # pumpe -> /rpc/Pump.Set
-                endpoint_name = self._entity_id.capitalize()
+                # Endpoint-Mapping: entity_id -> ESP32 RPC endpoint
+                # pumpe -> Pump (nicht Pumpe!)
+                endpoint_map = {
+                    "pumpe": "Pump",
+                }
+                
+                # Fallback: capitalize
+                if self._entity_id in endpoint_map:
+                    endpoint_name = endpoint_map[self._entity_id]
+                else:
+                    endpoint_name = self._entity_id.capitalize()
+                
                 url = f"http://{self._host}/rpc/{endpoint_name}.Set"
                 payload = {"on": state}
                 
-                _LOGGER.debug(f"Sending {state} to {url}")
+                _LOGGER.info(f"Switch {self._entity_id}: Sending POST to {url} with payload {payload}")
                 
                 async with self._session.post(
                     url,
                     json=payload,
                     headers={"Content-Type": "application/json"},
                 ) as response:
+                    response_text = await response.text()
+                    _LOGGER.info(f"Switch {self._entity_id}: Response HTTP {response.status}: {response_text}")
+                    
                     if response.status == 200:
                         await self.coordinator.async_request_refresh()
                     else:
                         _LOGGER.error(
-                            "Failed to set %s state: HTTP %s",
+                            "Failed to set %s state: HTTP %s - %s",
                             self._attr_name,
                             response.status,
+                            response_text,
                         )
                         
         except aiohttp.ClientError as err:

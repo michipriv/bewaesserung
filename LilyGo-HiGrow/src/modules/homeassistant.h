@@ -20,7 +20,7 @@
 // Device Information
 #define DEVICE_NAME "HiGrow"
 #define DEVICE_MODEL "LilyGo-HiGrow-v1.1"
-#define FIRMWARE_VERSION "1.2-HA"
+#define FIRMWARE_VERSION "1.4-HA"
 
 class HomeAssistantIntegration {
 private:
@@ -31,11 +31,15 @@ private:
     String mac_address;
     String device_id;
     
+    // Body buffers for POST requests
+    String pumpSetBody;
+    String pumpSetPWMBody;
+    
     // Endpoint Handlers
     void handleDeviceInfo(AsyncWebServerRequest *request);
     void handleGetStatus(AsyncWebServerRequest *request);
-    void handlePumpSet(AsyncWebServerRequest *request);
-    void handlePumpSetPWM(AsyncWebServerRequest *request);
+    void handlePumpSet(AsyncWebServerRequest *request, String body);
+    void handlePumpSetPWM(AsyncWebServerRequest *request, String body);
     
     // Helper Functions
     String getMacAddress();
