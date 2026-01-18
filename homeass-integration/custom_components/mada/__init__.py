@@ -1,4 +1,8 @@
 """HiGrow Irrigation System Integration."""
+# V1.3 Liest Entity-Metadaten vom ESP32
+# V1.2 Dynamische Sensor-Erkennung
+# V1.1 Initial
+
 import logging
 import asyncio
 from datetime import timedelta
@@ -17,21 +21,27 @@ from homeassistant.helpers.update_coordinator import (
 
 _LOGGER = logging.getLogger(__name__)
 
-DOMAIN = "higrow"
+DOMAIN = "mada"
 PLATFORMS = [Platform.SENSOR, Platform.SWITCH, Platform.NUMBER]
 
 SCAN_INTERVAL = timedelta(seconds=30)
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    """Set up HiGrow from a config entry."""
+    """Set up MADA from a config entry."""
     host = entry.data["host"]
     
-    coordinator = HiGrowDataUpdateCoordinator(hass, host)
+    coordinator = MadaDataUpdateCoordinator(hass, host)
     await coordinator.async_config_entry_first_refresh()
 
+    # Lade Entity-Metadaten vom ESP32
+    entity_metadata = await coordinator.fetch_entity_metadata()
+    
     hass.data.setdefault(DOMAIN, {})
-    hass.data[DOMAIN][entry.entry_id] = coordinator
+    hass.data[DOMAIN][entry.entry_id] = {
+        "coordinator": coordinator,
+        "entity_metadata": entity_metadata,
+    }
 
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -48,8 +58,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     return unload_ok
 
 
-class HiGrowDataUpdateCoordinator(DataUpdateCoordinator):
-    """Class to manage fetching HiGrow data."""
+class MadaDataUpdateCoordinator(DataUpdateCoordinator):
+    """Class to manage fetching MADA data."""
 
     def __init__(self, hass: HomeAssistant, host: str) -> None:
         """Initialize."""
@@ -63,8 +73,42 @@ class HiGrowDataUpdateCoordinator(DataUpdateCoordinator):
             update_interval=SCAN_INTERVAL,
         )
 
+    async def fetch_entity_metadata(self):
+        """Fetch entity metadata from ESP32 /mada endpoint."""
+        try:
+            async with async_timeout.timeout(10):
+                url = f"http://{self.host}/mada"
+                async with self.session.get(url) as response:
+                    if response.status != 200:
+                        _LOGGER.warning(f"Could not fetch entity metadata: {response.status}")
+                        return {}
+                    
+                    data = await response.json()
+                    entities = data.get("entities", [])
+                    
+                    _LOGGER.info(f"Loaded {len(entities)} entity definitions from ESP32")
+                    
+                    # Konvertiere zu Dictionary für schnellen Zugriff
+                    metadata = {}
+                    for entity in entities:
+                        entity_id = entity.get("id")
+                        if entity_id:
+                            metadata[entity_id] = entity
+                    
+                    return metadata
+                    
+        except asyncio.TimeoutError:
+            _LOGGER.warning(f"Timeout fetching metadata from {self.host}")
+            return {}
+        except aiohttp.ClientError as err:
+            _LOGGER.warning(f"Error fetching metadata from {self.host}: {err}")
+            return {}
+        except Exception as err:
+            _LOGGER.error(f"Unexpected error fetching metadata: {err}")
+            return {}
+
     async def _async_update_data(self):
-        """Fetch data from HiGrow device."""
+        """Fetch data from MADA device."""
         try:
             async with async_timeout.timeout(10):
                 url = f"http://{self.host}/rpc/mada.GetStatus"

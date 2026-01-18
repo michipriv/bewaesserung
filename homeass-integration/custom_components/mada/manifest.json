@@ -1,7 +1,7 @@
 {
-  "domain": "higrow",
-  "name": "HiGrow Irrigation",
-  "version": "1.0.0",
+  "domain": "mada",
+  "name": "MADA Sensor Integration",
+  "version": "1.1.0",
   "documentation": "https://github.com/michipriv/bewaesserung",
   "issue_tracker": "https://github.com/michipriv/bewaesserung/issues",
   "requirements": [],
@@ -11,7 +11,7 @@
   "zeroconf": [
     {
       "type": "_http._tcp.local.",
-      "name": "higrow*"
+      "name": "*"
     }
   ],
   "iot_class": "local_polling"

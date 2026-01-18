@@ -1,5 +1,13 @@
-"""Sensor platform for MADA integration."""
+"""Sensor platform for MADA integration using ESP32 entity metadata."""
+# V1.5 Nutzt data_path aus Entity-Metadaten - automatisches Mapping!
+# V1.4 Verbessertes Mapping
+# V1.3 Nutzt Entity-Metadaten vom ESP32
+# V1.2 Dynamische Sensor-Erkennung
+# V1.1 Initial
+
 from __future__ import annotations
+
+import logging
 
 from homeassistant.components.sensor import (
     SensorDeviceClass,
@@ -11,14 +19,31 @@ from homeassistant.const import (
     PERCENTAGE,
     UnitOfElectricPotential,
     UnitOfTemperature,
-    SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
-    UnitOfTime,
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import DOMAIN, MADADataUpdateCoordinator
+from . import DOMAIN
+
+_LOGGER = logging.getLogger(__name__)
+
+# Mapping von ESP32 device_class strings zu HA SensorDeviceClass
+DEVICE_CLASS_MAP = {
+    "moisture": SensorDeviceClass.MOISTURE,
+    "voltage": SensorDeviceClass.VOLTAGE,
+    "battery": SensorDeviceClass.BATTERY,
+    "temperature": SensorDeviceClass.TEMPERATURE,
+    "humidity": SensorDeviceClass.HUMIDITY,
+    "illuminance": SensorDeviceClass.ILLUMINANCE,
+}
+
+# Mapping von ESP32 state_class strings zu HA SensorStateClass
+STATE_CLASS_MAP = {
+    "measurement": SensorStateClass.MEASUREMENT,
+    "total": SensorStateClass.TOTAL,
+    "total_increasing": SensorStateClass.TOTAL_INCREASING,
+}
 
 
 async def async_setup_entry(
@@ -26,118 +51,111 @@ async def async_setup_entry(
     entry: ConfigEntry,
     async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up MADA sensors."""
-    coordinator = hass.data[DOMAIN][entry.entry_id]
+    """Set up MADA sensors using ESP32 metadata."""
+    data = hass.data[DOMAIN][entry.entry_id]
+    coordinator = data["coordinator"]
+    entity_metadata = data["entity_metadata"]
     
-    sensors = [
-        MADASensor(coordinator, entry, "soil_moisture", "Bodenfeuchte", "soil", "moisture"),
-        MADASensor(coordinator, entry, "soil_salt", "Salz", "soil", "salt", "µS/cm"),
-        MADASensor(coordinator, entry, "battery_voltage", "Batterie Spannung", "battery", "voltage"),
-        MADASensor(coordinator, entry, "battery_percent", "Batterie", "battery", "percent"),
-        MADASensor(coordinator, entry, "temperature", "Temperatur", "temperature", "value"),
-        MADASensor(coordinator, entry, "humidity", "Luftfeuchtigkeit", "humidity", "value"),
-        MADASensor(coordinator, entry, "light", "Helligkeit", "light", "lux", "lx"),
-        MADASensor(coordinator, entry, "wifi_rssi", "WiFi Signal", "system", "wifi_rssi"),
-        MADASensor(coordinator, entry, "uptime", "Uptime", "system", "uptime"),
-        MADASensor(coordinator, entry, "pwm_target", "Pumpenleistung Ziel", "pump", "pwm_target"),
-        MADASensor(coordinator, entry, "pwm_active", "Pumpenleistung Aktiv", "pump", "pwm_active"),
-    ]
+    sensors = []
     
+    # Erstelle Sensoren basierend auf ESP32 Metadaten
+    for entity_id, metadata in entity_metadata.items():
+        entity_type = metadata.get("type")
+        
+        # Nur Sensoren verarbeiten
+        if entity_type == "sensor":
+            _LOGGER.info(
+                "Creating sensor from metadata: %s (%s) at path %s",
+                metadata.get("name", entity_id),
+                entity_id,
+                metadata.get("data_path", "unknown")
+            )
+            
+            sensors.append(
+                MadaSensorFromMetadata(
+                    coordinator=coordinator,
+                    entry=entry,
+                    entity_id=entity_id,
+                    metadata=metadata,
+                )
+            )
+    
+    _LOGGER.info("Created %d sensors from ESP32 metadata", len(sensors))
     async_add_entities(sensors)
 
 
-class MADASensor(CoordinatorEntity, SensorEntity):
-    """Representation of a MADA sensor."""
+class MadaSensorFromMetadata(CoordinatorEntity, SensorEntity):
+    """Sensor created from ESP32 entity metadata."""
 
     def __init__(
         self,
-        coordinator: MADADataUpdateCoordinator,
+        coordinator,
         entry: ConfigEntry,
-        sensor_id: str,
-        name: str,
-        data_key: str,
-        data_subkey: str,
-        unit: str | None = None,
+        entity_id: str,
+        metadata: dict,
     ) -> None:
         """Initialize the sensor."""
         super().__init__(coordinator)
         
-        self._attr_unique_id = f"{entry.entry_id}_{sensor_id}"
-        self._attr_name = f"MADA {name}"
-        self._data_key = data_key
-        self._data_subkey = data_subkey
+        self._entity_id = entity_id
+        self._metadata = metadata
+        self._data_path = metadata.get("data_path", [])
+        
+        # Unique ID und Name
+        self._attr_unique_id = f"{entry.entry_id}_{entity_id}"
+        self._attr_name = f"MADA {metadata.get('name', entity_id)}"
         
         # Device info
         self._attr_device_info = {
             "identifiers": {(DOMAIN, entry.entry_id)},
             "name": "MADA Bewässerung",
-            "manufacturer": "LilyGo",
-            "model": entry.data.get("model", "MADA v1.1"),
-            "sw_version": entry.data.get("version", "1.2-HA"),
+            "manufacturer": "Custom",
+            "model": entry.data.get("model", "HiGrow"),
+            "sw_version": entry.data.get("version", "1.4"),
         }
         
-        # Sensor-specific configuration
-        if sensor_id == "soil_moisture":
-            self._attr_device_class = SensorDeviceClass.MOISTURE
-            self._attr_native_unit_of_measurement = PERCENTAGE
-            self._attr_state_class = SensorStateClass.MEASUREMENT
-            self._attr_icon = "mdi:water-percent"
-            
-        elif sensor_id == "soil_salt":
-            self._attr_native_unit_of_measurement = unit or "µS/cm"
-            self._attr_state_class = SensorStateClass.MEASUREMENT
-            self._attr_icon = "mdi:shaker"
-            
-        elif sensor_id == "battery_voltage":
-            self._attr_device_class = SensorDeviceClass.VOLTAGE
-            self._attr_native_unit_of_measurement = UnitOfElectricPotential.MILLIVOLT
-            self._attr_state_class = SensorStateClass.MEASUREMENT
-            
-        elif sensor_id == "battery_percent":
-            self._attr_device_class = SensorDeviceClass.BATTERY
-            self._attr_native_unit_of_measurement = PERCENTAGE
-            self._attr_state_class = SensorStateClass.MEASUREMENT
-            
-        elif sensor_id == "temperature":
-            self._attr_device_class = SensorDeviceClass.TEMPERATURE
-            self._attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
-            self._attr_state_class = SensorStateClass.MEASUREMENT
-            
-        elif sensor_id == "humidity":
-            self._attr_device_class = SensorDeviceClass.HUMIDITY
-            self._attr_native_unit_of_measurement = PERCENTAGE
-            self._attr_state_class = SensorStateClass.MEASUREMENT
-            
-        elif sensor_id == "light":
-            self._attr_device_class = SensorDeviceClass.ILLUMINANCE
-            self._attr_native_unit_of_measurement = unit or "lx"
-            self._attr_state_class = SensorStateClass.MEASUREMENT
-            
-        elif sensor_id == "wifi_rssi":
-            self._attr_device_class = SensorDeviceClass.SIGNAL_STRENGTH
-            self._attr_native_unit_of_measurement = SIGNAL_STRENGTH_DECIBELS_MILLIWATT
-            self._attr_state_class = SensorStateClass.MEASUREMENT
-            self._attr_entity_registry_enabled_default = False
-            
-        elif sensor_id == "uptime":
-            self._attr_device_class = SensorDeviceClass.DURATION
-            self._attr_native_unit_of_measurement = UnitOfTime.SECONDS
-            self._attr_state_class = SensorStateClass.TOTAL_INCREASING
-            self._attr_entity_registry_enabled_default = False
-            
-        elif sensor_id in ("pwm_target", "pwm_active"):
-            self._attr_native_unit_of_measurement = PERCENTAGE
-            self._attr_state_class = SensorStateClass.MEASUREMENT
-            self._attr_icon = "mdi:gauge"
+        # Device Class (aus ESP32 Metadaten)
+        device_class_str = metadata.get("device_class")
+        if device_class_str and device_class_str in DEVICE_CLASS_MAP:
+            self._attr_device_class = DEVICE_CLASS_MAP[device_class_str]
+        
+        # State Class (aus ESP32 Metadaten)
+        state_class_str = metadata.get("state_class")
+        if state_class_str and state_class_str in STATE_CLASS_MAP:
+            self._attr_state_class = STATE_CLASS_MAP[state_class_str]
+        
+        # Unit (aus ESP32 Metadaten)
+        unit = metadata.get("unit")
+        if unit:
+            self._attr_native_unit_of_measurement = unit
+        
+        # Icon (optional aus ESP32 Metadaten)
+        icon = metadata.get("icon")
+        if icon:
+            self._attr_icon = icon
 
     @property
     def native_value(self):
         """Return the state of the sensor."""
         if self.coordinator.data is None:
             return None
-            
+        
+        # Verwende data_path aus Metadaten
+        if not self._data_path or len(self._data_path) < 2:
+            _LOGGER.warning(f"No valid data_path for {self._entity_id}")
+            return None
+        
         try:
-            value = self.coordinator.data.get(self._data_key, {}).get(self._data_subkey)
+            # Navigate durch JSON mit data_path
+            # z.B. ["soil", "moisture"] -> data["soil"]["moisture"]
+            value = self.coordinator.data
+            for key in self._data_path:
+                value = value.get(key, {})
+                if value == {}:
+                    return None
+            
             return value
-        except (KeyError, TypeError):
+            
+        except (KeyError, TypeError, AttributeError) as e:
+            _LOGGER.debug(f"Could not get value for {self._entity_id} from {self._data_path}: {e}")
             return None
